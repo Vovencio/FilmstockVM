@@ -14,6 +14,7 @@ bool finished = false;
 
 int currentInstruction = 0;
 int instructionCount = 0;
+int exitCode = 0;
 
 double modulo(double num, double base) {
     return std::fmod(num, base);
@@ -25,18 +26,19 @@ char doubleToChar(double number) {
 }
 
 char* getStringFrom(int start, int end) {
-    char* result = new char[end - start]();
-
+    char* result = new char[end - start + 1]();
     for (int i = start; i < end; i++) {
         result[i - start] = doubleToChar(film[i]);
     }
+    result[end - start] = '\0';
+
 
     return result;
 }
 
 void print(int start, int end) {
-    char* toPrint = getStringFrom(start, end - 1);
-    std::cout << toPrint << std::endl;
+    char* toPrint = getStringFrom(start, end);
+    std::cout << toPrint;
     delete[] toPrint;
 }
 
@@ -45,7 +47,6 @@ void printNumbers(int start, int end) {
         std::cout << std::fixed << std::setprecision(2) << film[i];
         if (i < end - 1) std::cout << " ";
     }
-    std::cout << std::endl;
 }
 
 void set(int pos, double value) {
@@ -154,6 +155,30 @@ void jump (int jumpTo) {
     currentInstruction = static_cast<int>(film[jumpTo]);
 }
 
+void end (int getCodeFrom) {
+    exitCode = static_cast<int>(film[getCodeFrom]);
+    finished = true;
+}
+
+void floor (int pos1, int saveTo) {
+    film[saveTo] = std::floor(film[pos1]);
+}
+
+void round (int pos1, int saveTo) {
+    film[saveTo] = std::round(film[pos1]);
+}
+
+void ceil (int pos1, int saveTo) {
+    film[saveTo] = std::ceil(film[pos1]);
+}
+
+void time (int pos1) {
+    auto now = std::chrono::system_clock::now();
+    auto ms = std::chrono::duration_cast<std::chrono::milliseconds>(now.time_since_epoch()).count();
+
+    film[pos1] = ms;
+}
+
 //endregion
 
 void execute() {
@@ -183,13 +208,18 @@ void execute() {
         case 17: andOp(p1, p2, p3); break;
         case 18: orOp(p1, p2, p3); break;
         case 19: jumpIf(p1, p2); break;
-        case 20 : print(p1, p2); break;
+        case 20 : print(p1, p2+p1); break;
         case 21 : printNumbers(p1, p2+p1); break;
         case 22 : iterate(p1); break;
         case 23 : copyFrom(p1, p2); break;
         case 24 : pointer(p1, p2); break;
         case 25 : position(p1); break;
         case 26 : jump(p1); break;
+        case 27 : end(p1); break;
+        case 28 : floor(p1, p2); break;
+        case 29 : round(p1, p2); break;
+        case 30 : ceil(p1, p2); break;
+        case 31 : time(p1); break;
         default:
             printf("Unknown instruction type: %d\n", type);
             break;
@@ -212,7 +242,7 @@ double getDoubleFrom(unsigned char* buff, int start) {
 }
 
 int main() {
-    const char* path = "/home/vladiboi/Documents/GitHub/FilmStock/test.roll";
+    const char* path = "/home/vladiboi/Documents/GitHub/FilmStock/FilmStockCompilerAssembler/test.roll";
 
     // Load into vector first
     std::ifstream file(path, std::ios::binary | std::ios::ate);
@@ -293,7 +323,7 @@ int main() {
     auto start = std::chrono::high_resolution_clock::now();
 
     while (true) {
-        if (currentInstruction * 4 >= instructionCount){
+        if (currentInstruction * 4 >= instructionCount || finished){
             break;
         }
         execute();
@@ -302,7 +332,7 @@ int main() {
     auto end = std::chrono::high_resolution_clock::now();
     auto duration = std::chrono::duration_cast<std::chrono::milliseconds>(end - start);
 
-    std::cout << "[Program finished in " << duration.count() << "ms]" << std::endl;
+    std::cout << std::endl << "[Program finished in " << duration.count() << "ms with exit code: " << exitCode << "]" << std::endl;
 
     return 0;
 }
