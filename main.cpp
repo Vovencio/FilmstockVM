@@ -5,12 +5,16 @@
 #include <vector>
 #include <cstring>
 #include <chrono>
+#include <random>
+#include <thread>
 
 #define CHARACTER_COUNT 256
 
 double* film;
 int* instructions;
 bool finished = false;
+
+std::vector<std::vector<double>> matrix; // Escape the Matrix
 
 int currentInstruction = 0;
 int instructionCount = 0;
@@ -124,11 +128,11 @@ void notOp (int pos1, int saveTo) {
 }
 
 void andOp (int pos1, int pos2, int saveTo) {
-    film[saveTo] = (film[pos1] == 1.0 && film[pos2] == 1.0) ? 1.0 : 0.0;
+    film[saveTo] = (film[pos1] != 0 && film[pos2] != 0.0) ? 1.0 : 0.0;
 }
 
 void orOp (int pos1, int pos2, int saveTo) {
-    film[saveTo] = (film[pos1] == 1.0 || film[pos2] == 1.0) ? 1.0 : 0.0;
+    film[saveTo] = (film[pos1] != 1.0 || film[pos2] != 1.0) ? 1.0 : 0.0;
 }
 
 void jumpIf (int pos1, int jumpTo) {
@@ -179,6 +183,102 @@ void time (int pos1) {
     film[pos1] = ms;
 }
 
+void newList(int saveTo) {
+    matrix.push_back(std::vector<double>());
+    film[saveTo] = static_cast<double>(matrix.size() - 1);
+}
+
+void copyFromList (int listId, int pos1, int copyTo) {
+    film[copyTo] = matrix[static_cast<int>(film[listId])][static_cast<int>(film[pos1])];
+}
+
+void lengthOfList (int listId, int copyTo) {
+    film[copyTo] = static_cast<double>(matrix[static_cast<int>(film[listId])].size());
+}
+
+void listAmount (int copyTo) {
+    film[copyTo] = static_cast<double>(matrix.size());
+}
+
+void addList(int listId, int pos1) {
+    matrix[static_cast<int>(film[listId])].push_back(static_cast<int>(film[pos1]));
+}
+
+void removeAt(int listId, int pos1) {
+    int lId = static_cast<int>(film[listId]);
+
+    matrix[lId].erase(matrix[lId].begin() + static_cast<int>(film[pos1]));
+}
+
+void emptyList (int listId) {
+    matrix[static_cast<int>(film[listId])].clear();
+}
+
+void removeAll () {
+    matrix.clear();
+}
+
+void addAt(int listId, int pos2, int pos1) {
+    int lId = static_cast<int>(film[listId]);
+    int index = static_cast<int>(film[pos1]);
+    int value = static_cast<int>(film[pos2]);
+
+    if(lId < 0 || lId >= matrix.size()) return;
+    if(index < 0) index = 0;
+    if(index > matrix[lId].size()) index = matrix[lId].size();
+
+    matrix[lId].insert(matrix[lId].begin() + index, value);
+}
+
+
+void reverseList (int listId) {
+    std::reverse(matrix[static_cast<int>(film[listId])].begin(), matrix[static_cast<int>(film[listId])].end());
+}
+
+void shuffleList(int listId) {
+    int lId = static_cast<int>(film[listId]);
+
+    std::random_device rd;
+    std::mt19937 g(rd());
+    std::shuffle(matrix[lId].begin(), matrix[lId].end(), g);
+}
+
+
+void sort(int listId, int type) {
+    int lId = static_cast<int>(film[listId]);
+
+    if (film[type] == 0) {
+        std::sort(matrix[lId].begin(), matrix[lId].end()); // Ascending if 0
+    } else {
+        std::sort(matrix[lId].begin(), matrix[lId].end(), std::greater<double>()); // Descending if not 0
+    }
+}
+
+
+void sleep (int msPos) {
+    std::this_thread::sleep_for(std::chrono::milliseconds(static_cast<int>(film[msPos])));
+}
+
+void random (int saveTo) {
+    std::random_device rd;
+    std::mt19937 gen(rd());
+    std::uniform_real_distribution<> dis(0.0, 1.0);
+
+    film[saveTo] = dis(gen);
+}
+
+void clearConsole() {
+#ifdef _WIN32
+    system("cls");
+#else
+    system("clear");
+#endif
+}
+
+void listSet(int listId, int index, int setTo) {
+    matrix[static_cast<int>(film[listId])][static_cast<int>(film[index])] = film[setTo];
+}
+
 //endregion
 
 void execute() {
@@ -220,6 +320,22 @@ void execute() {
         case 29 : round(p1, p2); break;
         case 30 : ceil(p1, p2); break;
         case 31 : time(p1); break;
+        case 32 : newList(p1); break;
+        case 33 : copyFromList(p1, p2, p3); break;
+        case 34 : lengthOfList(p1, p2); break;
+        case 35 : listAmount(p1); break;
+        case 36 : addList(p1, p2); break;
+        case 37 : removeAt(p1, p2); break;
+        case 38 : emptyList(p1); break;
+        case 39 : removeAll(); break;
+        case 40 : addAt(p1, p2, p3); break;
+        case 41 : reverseList(p1); break;
+        case 42 : shuffleList(p1); break;
+        case 43 : sort (p1, p2); break;
+        case 44 : sleep(p1); break;
+        case 45 : random(p1); break;
+        case 46 : clearConsole(); break;
+        case 47 : listSet(p1, p2, p3);
         default:
             printf("Unknown instruction type: %d\n", type);
             break;
@@ -241,8 +357,13 @@ double getDoubleFrom(unsigned char* buff, int start) {
     return value;
 }
 
-int main() {
-    const char* path = "/home/vladiboi/Documents/GitHub/FilmStock/FilmStockCompilerAssembler/test.roll";
+int main(int argc, char* argv[]) {
+    if (argc < 2) {
+        std::cerr << "Usage: runner PATH_TO_LOAD_FROM\n";
+        return 1;
+    }
+
+    const char* path = argv[1];
 
     // Load into vector first
     std::ifstream file(path, std::ios::binary | std::ios::ate);
