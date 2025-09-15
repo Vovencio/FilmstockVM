@@ -14,26 +14,7 @@
 
 #include <stdio.h>
 
-#if defined(_WIN32) || defined(_WIN64)  // Windows
-#include <windows.h>
-
-void gotoxy(int x, int y) {
-    COORD coord;
-    coord.X = x;
-    coord.Y = y;
-    SetConsoleCursorPosition(GetStdHandle(STD_OUTPUT_HANDLE), coord);
-}
-
-#else
-void gotoxy(int x, int y) {
-    printf("\033[%d;%dH", y + 1, x + 1);
-    fflush(stdout);
-}
-#endif
-
-#ifdef _WIN32
-#include <windows.h>
-#endif
+#include "renderer.h"
 
 double* film;
 int* instructions;
@@ -53,6 +34,17 @@ double modulo(double num, double base) {
 char doubleToChar(double number) {
     int index = static_cast<int>(modulo(number, CHARACTER_COUNT));
     return static_cast<char>(index);
+}
+
+std::string doubleVectorToString(const std::vector<double>& input) {
+    std::string result;
+    result.reserve(input.size());
+
+    for (double d : input) {
+        result += doubleToChar(d);  // your custom function
+    }
+
+    return result;  // safe: returned by value, no leaks
 }
 
 char* getStringFrom(int start, int end) {
@@ -103,6 +95,77 @@ void printNumbers(int start, int end) {
 
 void set(int pos, double value) {
     film[pos] = value;
+}
+
+void oppSetNewColor(int pos) {
+    setNewColor(film[pos]);
+}
+
+void oppSetPosition(int xPos, int yPos) {
+    setCursorPosition(film[xPos], film[yPos]);
+}
+
+void oppSetTextSize(int pos) {
+    setTextSize(film[pos]);
+}
+
+void oppDrawTriangles(int pos) {
+    int id = static_cast<int>(film[pos]);
+
+    drawTriangles(matrix[id]);
+}
+
+void oppDrawText(int pos) {
+    int id = static_cast<int>(film[pos]);
+
+    drawText(doubleVectorToString(matrix[id]));
+}
+
+void oppBeginDrawing() {
+    beginDrawing();
+}
+
+void oppEndDrawing() {
+    endDrawing();
+}
+
+void oppIsPressed(int c, int saveTo) {
+    film[saveTo] = isPressed(static_cast<int>(film[c]));
+}
+
+void mousePressed(int type, int saveTo) {
+    int t = static_cast<int> (film[type]);
+
+    switch (t) {
+        case 0 :
+            film[saveTo] = IsMouseButtonDown(MOUSE_LEFT_BUTTON); break;
+        case 1 :
+            film[saveTo] = IsMouseButtonDown(MOUSE_RIGHT_BUTTON); break;
+        case 2 :
+            film[saveTo] = IsMouseButtonDown(MOUSE_MIDDLE_BUTTON); break;
+        default:
+            cerr << "Unknown mouse button: " << t;
+    }
+}
+
+void getMouseX(int saveTo) {
+    film[saveTo] = GetMousePosition().x;
+}
+
+void getMouseY(int saveTo) {
+    film[saveTo] = GetMousePosition().y;
+}
+
+void getScroll(int saveTo) {
+    film[saveTo] = GetMouseWheelMove();
+}
+
+void getWidth(int saveTo) {
+    film[saveTo] = GetScreenWidth();
+}
+
+void getHeight(int saveTo) {
+    film[saveTo] = GetScreenHeight();
 }
 
 //region Mathematical operations
@@ -249,7 +312,7 @@ void listAmount(int copyTo) {
 }
 
 void addList(int listId, int pos1) {
-    matrix[static_cast<int>(film[listId])].push_back(static_cast<int>(film[pos1]));
+    matrix[static_cast<int>(film[listId])].push_back(film[pos1]);
 }
 
 void removeAt(int listId, int pos1) {
@@ -308,32 +371,11 @@ void sleep(int msPos) {
     std::this_thread::sleep_for(std::chrono::milliseconds(static_cast<int>(film[msPos])));
 }
 
+
 void random(int saveTo) {
-    std::random_device rd;
-    std::mt19937 gen(rd());
+    std::random_device rd;               // hardware/random entropy source
     std::uniform_real_distribution<> dis(0.0, 1.0);
-
-    film[saveTo] = dis(gen);
-}
-
-void clearConsole() {
-#ifdef _WIN32
-    HANDLE hConsole = GetStdHandle(STD_OUTPUT_HANDLE);
-    CONSOLE_SCREEN_BUFFER_INFO csbi;
-    DWORD count;
-    DWORD cellCount;
-
-    if (hConsole == INVALID_HANDLE_VALUE) return;
-
-    if (!GetConsoleScreenBufferInfo(hConsole, &csbi)) return;
-    cellCount = csbi.dwSize.X * csbi.dwSize.Y;
-
-    FillConsoleOutputCharacter(hConsole, ' ', cellCount, { 0, 0 }, &count);
-    FillConsoleOutputAttribute(hConsole, csbi.wAttributes, cellCount, { 0, 0 }, &count);
-    SetConsoleCursorPosition(hConsole, { 0, 0 });
-#else
-    std::cout << "\033[2J\033[H" << std::flush;
-#endif
+    film[saveTo] = dis(rd);             // generate a value in [0,1)
 }
 
 void listSet(int listId, int index, int setTo) {
@@ -381,61 +423,76 @@ void execute() {
     int p3 = instructions[currentInstruction * 4 + 3];
 
     switch (type) {
-    case 0: copy(p1, p2); break;
-    case 1: add(p1, p2, p3); break;
-    case 2: subtract(p1, p2, p3); break;
-    case 3: multiply(p1, p2, p3); break;
-    case 4: divide(p1, p2, p3); break;
-    case 5: squareRoot(p1, p2); break;
-    case 6: sin(p1, p2); break;
-    case 7: cos(p1, p2); break;
-    case 8: tan(p1, p2); break;
-    case 9: asin(p1, p2); break;
-    case 10: acos(p1, p2); break;
-    case 11: atan2(p1, p2, p3); break;
-    case 12: pow(p1, p2, p3); break;
-    case 13: mod(p1, p2, p3); break;
-    case 14: equal(p1, p2, p3); break;
-    case 15: compare(p1, p2, p3); break;
-    case 16: notOp(p1, p2); break;
-    case 17: andOp(p1, p2, p3); break;
-    case 18: orOp(p1, p2, p3); break;
-    case 19: jumpIf(p1, p2); break;
-    case 20: print(p1, p2 + p1); break;
-    case 21: printNumbers(p1, p2 + p1); break;
-    case 22: iterate(p1); break;
-    case 23: copyFrom(p1, p2); break;
-    case 24: pointer(p1, p2); break;
-    case 25: position(p1); break;
-    case 26: jump(p1); break;
-    case 27: end(p1); break;
-    case 28: floor(p1, p2); break;
-    case 29: round(p1, p2); break;
-    case 30: ceil(p1, p2); break;
-    case 31: time(p1); break;
-    case 32: newList(p1); break;
-    case 33: copyFromList(p1, p2, p3); break;
-    case 34: lengthOfList(p1, p2); break;
-    case 35: listAmount(p1); break;
-    case 36: addList(p1, p2); break;
-    case 37: removeAt(p1, p2); break;
-    case 38: emptyList(p1); break;
-    case 39: removeAll(); break;
-    case 40: addAt(p1, p2, p3); break;
-    case 41: reverseList(p1); break;
-    case 42: shuffleList(p1); break;
-    case 43: sort(p1, p2); break;
-    case 44: sleep(p1); break;
-    case 45: random(p1); break;
-    case 46: clearConsole(); break;
-    case 47: listSet(p1, p2, p3); break;
-    case 48: updateConsole(); break;
-    case 49: printVector(p1); break;
-    case 50: printVectorNumbers(p1); break;
-    case 51: printVectorSeparated(p1, p2, p3); break;
-    default:
-        printf("Unknown instruction type: %d\n", type);
-        break;
+        case 0: copy(p1, p2); break;
+        case 1: add(p1, p2, p3); break;
+        case 2: subtract(p1, p2, p3); break;
+        case 3: multiply(p1, p2, p3); break;
+        case 4: divide(p1, p2, p3); break;
+        case 5: squareRoot(p1, p2); break;
+        case 6: sin(p1, p2); break;
+        case 7: cos(p1, p2); break;
+        case 8: tan(p1, p2); break;
+        case 9: asin(p1, p2); break;
+        case 10: acos(p1, p2); break;
+        case 11: atan2(p1, p2, p3); break;
+        case 12: pow(p1, p2, p3); break;
+        case 13: mod(p1, p2, p3); break;
+        case 14: equal(p1, p2, p3); break;
+        case 15: compare(p1, p2, p3); break;
+        case 16: notOp(p1, p2); break;
+        case 17: andOp(p1, p2, p3); break;
+        case 18: orOp(p1, p2, p3); break;
+        case 19: jumpIf(p1, p2); break;
+        case 20: print(p1, p2 + p1); break;
+        case 21: printNumbers(p1, p2 + p1); break;
+        case 22: iterate(p1); break;
+        case 23: copyFrom(p1, p2); break;
+        case 24: pointer(p1, p2); break;
+        case 25: position(p1); break;
+        case 26: jump(p1); break;
+        case 27: end(p1); break;
+        case 28: floor(p1, p2); break;
+        case 29: round(p1, p2); break;
+        case 30: ceil(p1, p2); break;
+        case 31: time(p1); break;
+        case 32: newList(p1); break;
+        case 33: copyFromList(p1, p2, p3); break;
+        case 34: lengthOfList(p1, p2); break;
+        case 35: listAmount(p1); break;
+        case 36: addList(p1, p2); break;
+        case 37: removeAt(p1, p2); break;
+        case 38: emptyList(p1); break;
+        case 39: removeAll(); break;
+        case 40: addAt(p1, p2, p3); break;
+        case 41: reverseList(p1); break;
+        case 42: shuffleList(p1); break;
+        case 43: sort(p1, p2); break;
+        case 44: sleep(p1); break;
+        case 45: random(p1); break;
+        case 46: break;
+        case 47: listSet(p1, p2, p3); break;
+        case 48: updateConsole(); break;
+        case 49: printVector(p1); break;
+        case 50: printVectorNumbers(p1); break;
+        case 51: printVectorSeparated(p1, p2, p3); break;
+        case 52: oppSetNewColor(p1); break;
+        case 53: oppSetPosition(p1, p2); break;
+        case 54: oppSetTextSize(p1); break;
+        case 55: oppDrawTriangles(p1); break;
+        case 56: oppDrawText(p1); break;
+        case 57: oppBeginDrawing(); break;
+        case 58: oppEndDrawing(); break;
+        case 59: oppIsPressed(p1, p2); break;
+        case 60: mousePressed(p1, p2); break;
+        case 61: getMouseX(p1); break;
+        case 62: getMouseY(p1); break;
+        case 63: getScroll(p1); break;
+        case 64: getWidth(p1); break;
+        case 65: getHeight(p1); break;
+
+        default:
+            printf("Unknown instruction type: %d\n", type);
+            break;
     }
 
     if (type != 19 && type != 26)
@@ -455,15 +512,6 @@ double getDoubleFrom(unsigned char* buff, int start) {
 }
 
 int main(int argc, char* argv[]) {
-#ifdef _WIN32
-    HANDLE hOut = GetStdHandle(STD_OUTPUT_HANDLE);
-    CONSOLE_CURSOR_INFO cursorInfo;
-    GetConsoleCursorInfo(hOut, &cursorInfo);
-    cursorInfo.bVisible = FALSE; // Hide cursor
-    SetConsoleCursorInfo(hOut, &cursorInfo);
-#endif
-
-
     if (argc < 2) {
         std::cerr << "Usage: runner PATH_TO_LOAD_FROM\n";
         return 1;
@@ -546,18 +594,46 @@ int main(int argc, char* argv[]) {
 
     instructionCount = instructionAmount / 4;
 
+    bool graphicalMode = false;
+
+    for (int i = 0; i < instructionCount; i++) {
+        int opp = instructions[i*4];
+        if (opp > 51 && opp < 66) {
+            graphicalMode = true;
+            break;
+        }
+    }
+
+    if (graphicalMode) {
+        InitGraphics();
+    }
+
     // Start time
     auto start = std::chrono::high_resolution_clock::now();
 
-    while (true) {
-        if (currentInstruction * 4 >= instructionCount || finished) {
-            break;
+    if (!graphicalMode) {
+        while (true) {
+            if (currentInstruction * 4 >= instructionCount || finished) {
+                break;
+            }
+            execute();
         }
-        execute();
+    }
+    else {
+        while (!WindowShouldClose()) {
+            if (currentInstruction * 4 >= instructionCount || finished) {
+                break;
+            }
+            execute();
+        }
     }
 
     auto end = std::chrono::high_resolution_clock::now();
     auto duration = std::chrono::duration_cast<std::chrono::milliseconds>(end - start);
+
+    if (graphicalMode) {
+        Cleanup();
+    }
 
     std::cout << std::endl << "[Program finished in " << duration.count() << "ms with exit code: " << exitCode << "]" << std::endl;
 
