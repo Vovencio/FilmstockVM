@@ -1,1 +1,4 @@
-g++ -O3 -std=c++17 -Wall -Wextra -Wpedantic -o runner main.cpp
+g++ -O3 -std=c++20 -Wall -Wextra -Wpedantic \
+    main.cpp \
+    -o runner \
+    -lraylib -lm -ldl -lpthread -lGL -lX11
