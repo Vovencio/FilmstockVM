@@ -11,6 +11,7 @@
 #include <algorithm>
 
 #define CHARACTER_COUNT 256
+#define STEP 4
 
 #include <stdio.h>
 
@@ -18,7 +19,6 @@
 
 double* film;
 int* instructions;
-bool finished = false;
 std::vector<char> printBuffer;
 
 std::vector<std::vector<double>> matrix; // Escape the Matrix
@@ -247,7 +247,8 @@ void orOp(int pos1, int pos2, int saveTo) {
 }
 
 void jumpIf(int pos1, int jumpTo) {
-    currentInstruction = (film[pos1] != 0) ? static_cast<int>(film[jumpTo]) : currentInstruction + 1;
+    currentInstruction = (film[pos1] != 0) ? static_cast<int>(film[jumpTo])*4 - STEP :
+    currentInstruction;
 }
 
 void iterate(int pos1) {
@@ -267,12 +268,12 @@ void position(int pos1) {
 }
 
 void jump(int jumpTo) {
-    currentInstruction = static_cast<int>(film[jumpTo]);
+    currentInstruction = static_cast<int>(film[jumpTo])*4 - STEP;
 }
 
 void end(int getCodeFrom) {
     exitCode = static_cast<int>(film[getCodeFrom]);
-    finished = true;
+    currentInstruction = INT_MAX;
 }
 
 void floor(int pos1, int saveTo) {
@@ -417,10 +418,10 @@ void printVectorSeparated(int p1, int p2, int p3) {
 //endregion
 
 void execute() {
-    int type = instructions[currentInstruction * 4];
-    int p1 = instructions[currentInstruction * 4 + 1];
-    int p2 = instructions[currentInstruction * 4 + 2];
-    int p3 = instructions[currentInstruction * 4 + 3];
+    int type = instructions[currentInstruction];
+    int p1 = instructions[currentInstruction + 1];
+    int p2 = instructions[currentInstruction + 2];
+    int p3 = instructions[currentInstruction + 3];
 
     switch (type) {
         case 0: copy(p1, p2); break;
@@ -495,8 +496,7 @@ void execute() {
             break;
     }
 
-    if (type != 19 && type != 26)
-        currentInstruction++; // move to the next instruction
+    currentInstruction += STEP;
 }
 
 int getIntFrom(unsigned char* buff, int start) {
@@ -611,19 +611,14 @@ int main(int argc, char* argv[]) {
     // Start time
     auto start = std::chrono::high_resolution_clock::now();
 
+    const int instructionEnd = instructionCount;
     if (!graphicalMode) {
-        while (true) {
-            if (currentInstruction * 4 >= instructionCount || finished) {
-                break;
-            }
+        while (currentInstruction < instructionEnd) {
             execute();
         }
     }
     else {
-        while (!WindowShouldClose()) {
-            if (currentInstruction * 4 >= instructionCount || finished) {
-                break;
-            }
+        while (!WindowShouldClose() && currentInstruction < instructionEnd) {
             execute();
         }
     }
