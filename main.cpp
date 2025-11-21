@@ -496,6 +496,83 @@ Operation get_operation_from_id(const int id) {
     }
 }
 
+bool get_is_boundary(const int id) {
+    switch (id) {
+        case 0:  return false; // return copy;
+        case 1:  return false; // return add;
+        case 2:  return false; // return subtract;
+        case 3:  return false; // return multiply;
+        case 4:  return false; // return divide;
+        case 5:  return false; // return squareRoot;
+        case 6:  return false; // return sin;
+        case 7:  return false; // return cos;
+        case 8:  return false; // return tan;
+        case 9:  return false; // return asin;
+        case 10: return false; // return acos;
+        case 11: return false; // return atan2;
+        case 12: return false; // return pow;
+        case 13: return false; // return mod;
+        case 14: return false; // return equal;
+        case 15: return false; // return compare;
+        case 16: return false; // return notOp;
+        case 17: return false; // return andOp;
+        case 18: return false; // return orOp;
+        case 19: return true; // return jumpIf;
+        case 20: return false; // return print;
+        case 21: return false; // return printNumbers;
+        case 22: return false; // return iterate;
+        case 23: return false; // return copyFrom;
+        case 24: return false; // return pointer;
+        case 25: return false; // return position;
+        case 26: return true; // return jump;
+        case 27: return true; // return end;
+        case 28: return false; // return floor;
+        case 29: return false; // return round;
+        case 30: return false; // return ceil;
+        case 31: return false; // return time;
+        case 32: return false; // return newList;
+        case 33: return false; // return copyFromList;
+        case 34: return false; // return lengthOfList;
+        case 35: return false; // return listAmount;
+        case 36: return false; // return addList;
+        case 37: return false; // return removeAt;
+        case 38: return false; // return emptyList;
+        case 39: return false; // return removeAll;
+        case 40: return false; // return addAt;
+        case 41: return false; // return reverseList;
+        case 42: return false; // return shuffleList;
+        case 43: return false; // return opp_sort;
+        case 44: return false; // return sleep;
+        case 45: return false; // return random;
+            // TODO: USE CODE 46
+        case 46: return false;// return copy;
+            // TODO: USE CODE 46
+        case 47: return false; // return listSet;
+        case 48: return false; // return updateConsole;
+        case 49: return false; // return printVector;
+        case 50: return false; // return printVectorNumbers;
+        case 51: return false; // return printVectorSeparated;
+        case 52: return false; // return oppSetNewColor;
+        case 53: return false; // return oppSetPosition;
+        case 54: return false; // return oppSetTextSize;
+        case 55: return false; // return oppDrawTriangles;
+        case 56: return false; // return oppDrawText;
+        case 57: return false; // return oppBeginDrawing;
+        case 58: return false; // return oppEndDrawing;
+        case 59: return false; // return oppIsPressed;
+        case 60: return false; // return mousePressed;
+        case 61: return false; // return getMouseX;
+        case 62: return false; // return getMouseY;
+        case 63: return false; // return getScroll;
+        case 64: return false; // return getWidth;
+        case 65: return false; // return getHeight;
+
+        default:
+            printf("Unknown instruction type: %d\n", id);
+            return false;
+    }
+}
+
 const int opp_amount = 66;
 
 Operation opp_arr[opp_amount];
@@ -628,18 +705,39 @@ int main(int argc, char* argv[]) {
         InitGraphics();
     }
 
+    int bounds[instructionCount];
+
+    for (int i = instructionCount - 4; i > -1; i-=4) {
+        bool isBoundary = get_is_boundary(instructions[i]);
+
+        if (isBoundary || (i == instructionCount - 4)) {
+            bounds[i] = 1;
+        }
+        else {
+            bounds[i] = bounds[i+4] + 1;
+        }
+    }
+
     // Start time
     auto start = std::chrono::high_resolution_clock::now();
 
     const int instructionEnd = instructionCount;
     if (!graphicalMode) {
         while (currentInstruction < instructionEnd) {
-            execute();
+            const int endexec = bounds[currentInstruction];
+
+            for (int i = 0; i < endexec; i++) {
+                execute();
+            }
         }
     }
     else {
-        while (!WindowShouldClose() && currentInstruction < instructionEnd) {
-            execute();
+        while (!WindowShouldClose() || currentInstruction < instructionEnd) {
+            const int endexec = bounds[currentInstruction];
+
+            for (int i = 0; i < endexec; i++) {
+                execute();
+            }
         }
     }
 
