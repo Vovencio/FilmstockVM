@@ -399,7 +399,7 @@ void printVectorNumbers(int p1, int trash, int trash2) {
         }
     }
 
-    addToBuffer("]\n");
+    addToBuffer("]");
 }
 
 void printVectorSeparated(int p1, int p2, int p3) {
