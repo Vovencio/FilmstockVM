@@ -16,6 +16,7 @@
 #include <stdio.h>
 
 #include "renderer.h"
+#include <climits>
 
 double* film;
 int* instructions;
@@ -732,7 +733,7 @@ int main(int argc, char* argv[]) {
         }
     }
     else {
-        while (!WindowShouldClose() || currentInstruction < instructionEnd) {
+        while (!WindowShouldClose() && currentInstruction < instructionEnd) {
             const int endexec = bounds[currentInstruction];
 
             for (int i = 0; i < endexec; i++) {
