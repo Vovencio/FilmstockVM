@@ -45,7 +45,11 @@ inline void setNewColor(double input) {
     const int b = static_cast<int>(i >> 16) & 0xFF;
     const int a = static_cast<int>(i >> 24) & 0xFF;
 
-    currentColor = Color(r, g, b, a);
+    currentColor = (Color){
+        (unsigned char) r,
+        (unsigned char) g,
+        (unsigned char) b,
+        (unsigned char) a};
 }
 
 inline void setCursorPosition(double x, double y) {
